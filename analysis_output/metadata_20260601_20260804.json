@@ -1,0 +1,321 @@
+{
+  "period": "2026-06-01 through 2026-08-04",
+  "market_cap_source": "https://raw.githubusercontent.com/FinanceData/marcap/master/data/marcap-2026.parquet",
+  "flow_source": "Naver Finance foreign/institution daily net trading volume; underlying domestic basic data marked as KRX-provided",
+  "flow_value_method": "estimated value = daily net volume multiplied by daily close",
+  "last_market_cap_date": "2026-08-03",
+  "diagnostics": [
+    {
+      "Code": "005930",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "005930",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "005930",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "005930",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "000660",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "000660",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "000660",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "000660",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "105560",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "105560",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "105560",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "105560",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "055550",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "055550",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "055550",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "055550",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "086790",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "086790",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "086790",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "086790",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "032830",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "032830",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "032830",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "032830",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "316140",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "316140",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "316140",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "316140",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "024110",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "024110",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "024110",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "024110",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "033780",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "033780",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "033780",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "033780",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "015760",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "015760",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "015760",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "015760",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "278470",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "278470",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "278470",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "278470",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "003230",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "003230",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "003230",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "003230",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "090430",
+      "Page": 1,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "090430",
+      "Page": 2,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "090430",
+      "Page": 3,
+      "status": "ok",
+      "rows": 31
+    },
+    {
+      "Code": "090430",
+      "Page": 4,
+      "status": "ok",
+      "rows": 31
+    }
+  ]
+}
