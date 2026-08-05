@@ -1,9 +1,0 @@
-{
-  "market_cap_source": "https://raw.githubusercontent.com/FinanceData/marcap/master/data/marcap-2026.parquet",
-  "flow_source": "Naver Finance investor trend, KRX-provided",
-  "flow_value_method": "net shares x close; estimate",
-  "date_range": [
-    "2026-06-01",
-    "2026-08-05"
-  ]
-}
