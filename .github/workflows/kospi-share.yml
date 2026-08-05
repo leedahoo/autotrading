@@ -58,12 +58,24 @@ jobs:
 
           names = july[july['Code'].isin(sum(baskets.values(), []))][['Code','Name']].drop_duplicates().sort_values('Code')
           names.to_csv('analysis_output/basket_constituents.csv', index=False)
+
+          calculated = float(df[(df['Date'] == '2026-08-04') & (df['Market'] == 'KOSPI')]['Marcap'].sum())
+          kred_published = 52_449_340.00 * 100_000_000
+          validation = pd.DataFrame([{
+              'date': '2026-08-04',
+              'marcap_cache_krw': calculated,
+              'kred_published_krw': kred_published,
+              'difference_krw': calculated - kred_published,
+              'difference_pct': (calculated / kred_published - 1) * 100,
+          }])
+          validation.to_csv('analysis_output/source_validation.csv', index=False)
           print(out.to_string(index=False))
+          print(validation.to_string(index=False))
           PY
       - name: Commit output
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add analysis_output
-          git commit -m 'Add July 2026 KOSPI basket share data [skip ci]'
+          git commit -m 'Validate KOSPI market-cap source [skip ci]'
           git push
