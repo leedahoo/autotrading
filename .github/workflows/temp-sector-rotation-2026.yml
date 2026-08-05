@@ -1,0 +1,193 @@
+name: Temporary sector rotation dataset
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/temp-sector-rotation-2026.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install pandas pyarrow requests pykrx
+      - name: Build June-August dataset
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import time
+          import requests
+          import pandas as pd
+          from pykrx import stock
+
+          START = '20260601'
+          END = '20260804'
+          START_DT = pd.Timestamp('2026-06-01')
+          END_DT = pd.Timestamp('2026-08-04')
+
+          baskets = {
+              '반도체': ['005930', '000660'],
+              '금융': ['105560', '055550', '086790', '032830', '316140', '024110'],
+              '생활소비재': ['033780', '015760', '278470', '003230', '090430'],
+          }
+          all_codes = sum(baskets.values(), [])
+
+          output = Path('analysis_output')
+          output.mkdir(exist_ok=True)
+
+          # KRX 전종목 일별 시가총액 공개 캐시
+          url = 'https://raw.githubusercontent.com/FinanceData/marcap/master/data/marcap-2026.parquet'
+          p = Path('/tmp/marcap-2026.parquet')
+          r = requests.get(url, timeout=180)
+          r.raise_for_status()
+          p.write_bytes(r.content)
+
+          raw = pd.read_parquet(p)
+          raw['Date'] = pd.to_datetime(raw['Date'])
+          raw['Code'] = raw['Code'].astype(str).str.zfill(6)
+          period = raw[(raw['Date'] >= START_DT) & (raw['Date'] <= END_DT) & (raw['Market'] == 'KOSPI')].copy()
+          if period.empty:
+              raise RuntimeError('No KOSPI market-cap data returned for requested period')
+
+          total = period.groupby('Date')['Marcap'].sum().rename('KOSPI_Marcap')
+          selected = period[period['Code'].isin(all_codes)][['Date','Code','Name','Close','Marcap','Stocks']].copy()
+
+          # 투자자별 일별 순매수 금액: pykrx가 KRX 종목별 투자자 거래실적을 조회
+          flow_frames = []
+          diagnostics = []
+          for code in all_codes:
+              last_error = None
+              flow = None
+              for attempt in range(3):
+                  try:
+                      flow = stock.get_market_trading_value_by_date(START, END, code)
+                      if flow is not None and not flow.empty:
+                          break
+                  except Exception as exc:
+                      last_error = repr(exc)
+                      time.sleep(3 * (attempt + 1))
+              if flow is None or flow.empty:
+                  diagnostics.append({'Code': code, 'status': 'failed', 'error': last_error})
+                  continue
+              flow = flow.copy()
+              flow.index = pd.to_datetime(flow.index)
+              inst_col = next((c for c in ['기관합계','기관'] if c in flow.columns), None)
+              foreign_col = next((c for c in ['외국인합계','외국인'] if c in flow.columns), None)
+              if inst_col is None or foreign_col is None:
+                  diagnostics.append({'Code': code, 'status': 'bad_columns', 'columns': list(map(str, flow.columns))})
+                  continue
+              tmp = flow[[inst_col, foreign_col]].rename(columns={inst_col:'Institution_Net', foreign_col:'Foreign_Net'})
+              tmp['Date'] = tmp.index
+              tmp['Code'] = code
+              flow_frames.append(tmp.reset_index(drop=True))
+              diagnostics.append({'Code': code, 'status': 'ok', 'rows': len(tmp), 'first': str(tmp['Date'].min().date()), 'last': str(tmp['Date'].max().date()), 'columns': list(map(str, flow.columns))})
+              time.sleep(0.8)
+
+          if not flow_frames:
+              raise RuntimeError('No investor-flow data returned')
+
+          flows = pd.concat(flow_frames, ignore_index=True)
+          daily_stock = selected.merge(flows, on=['Date','Code'], how='left')
+          daily_stock['Institution_Net'] = daily_stock['Institution_Net'].fillna(0)
+          daily_stock['Foreign_Net'] = daily_stock['Foreign_Net'].fillna(0)
+
+          code_to_basket = {code: basket for basket, codes in baskets.items() for code in codes}
+          daily_stock['Basket'] = daily_stock['Code'].map(code_to_basket)
+          daily_stock = daily_stock.merge(total.reset_index(), on='Date', how='left')
+          daily_stock['KOSPI_Share_Pct'] = daily_stock['Marcap'] / daily_stock['KOSPI_Marcap'] * 100
+          daily_stock = daily_stock.sort_values(['Date','Basket','Code'])
+          daily_stock.to_csv(output / 'stock_daily_20260601_20260804.csv', index=False, encoding='utf-8-sig')
+
+          basket_daily = daily_stock.groupby(['Date','Basket'], as_index=False).agg(
+              Basket_Marcap=('Marcap','sum'),
+              Foreign_Net=('Foreign_Net','sum'),
+              Institution_Net=('Institution_Net','sum'),
+              KOSPI_Marcap=('KOSPI_Marcap','first'),
+          )
+          basket_daily['KOSPI_Share_Pct'] = basket_daily['Basket_Marcap'] / basket_daily['KOSPI_Marcap'] * 100
+          basket_daily.to_csv(output / 'basket_daily_20260601_20260804.csv', index=False, encoding='utf-8-sig')
+
+          periods = [
+              ('6월', pd.Timestamp('2026-06-01'), pd.Timestamp('2026-06-30')),
+              ('7월', pd.Timestamp('2026-07-01'), pd.Timestamp('2026-07-31')),
+              ('8월(1~4일)', pd.Timestamp('2026-08-01'), pd.Timestamp('2026-08-04')),
+              ('전체(6/1~8/4)', pd.Timestamp('2026-06-01'), pd.Timestamp('2026-08-04')),
+          ]
+          summary_rows = []
+          for label, fr, to in periods:
+              block = basket_daily[(basket_daily['Date'] >= fr) & (basket_daily['Date'] <= to)]
+              for basket, g in block.groupby('Basket'):
+                  g = g.sort_values('Date')
+                  first = g.iloc[0]
+                  last = g.iloc[-1]
+                  summary_rows.append({
+                      'Period': label,
+                      'Basket': basket,
+                      'Start_Date': first['Date'].date().isoformat(),
+                      'End_Date': last['Date'].date().isoformat(),
+                      'Start_Marcap': int(first['Basket_Marcap']),
+                      'End_Marcap': int(last['Basket_Marcap']),
+                      'Marcap_Change': int(last['Basket_Marcap'] - first['Basket_Marcap']),
+                      'Marcap_Change_Pct': (last['Basket_Marcap'] / first['Basket_Marcap'] - 1) * 100,
+                      'Foreign_Net_Sum': int(g['Foreign_Net'].sum()),
+                      'Institution_Net_Sum': int(g['Institution_Net'].sum()),
+                      'Start_KOSPI_Share_Pct': first['KOSPI_Share_Pct'],
+                      'End_KOSPI_Share_Pct': last['KOSPI_Share_Pct'],
+                      'KOSPI_Share_Change_Pp': last['KOSPI_Share_Pct'] - first['KOSPI_Share_Pct'],
+                  })
+          summary = pd.DataFrame(summary_rows)
+          summary.to_csv(output / 'basket_period_summary_20260601_20260804.csv', index=False, encoding='utf-8-sig')
+
+          # 월별 종목 단위 요약
+          month_rows = []
+          for label, fr, to in periods[:3]:
+              block = daily_stock[(daily_stock['Date'] >= fr) & (daily_stock['Date'] <= to)]
+              for (basket, code, name), g in block.groupby(['Basket','Code','Name']):
+                  g = g.sort_values('Date')
+                  first = g.iloc[0]
+                  last = g.iloc[-1]
+                  month_rows.append({
+                      'Period': label,
+                      'Basket': basket,
+                      'Code': code,
+                      'Name': name,
+                      'Start_Date': first['Date'].date().isoformat(),
+                      'End_Date': last['Date'].date().isoformat(),
+                      'Start_Marcap': int(first['Marcap']),
+                      'End_Marcap': int(last['Marcap']),
+                      'Marcap_Change': int(last['Marcap'] - first['Marcap']),
+                      'Marcap_Change_Pct': (last['Marcap'] / first['Marcap'] - 1) * 100,
+                      'Foreign_Net_Sum': int(g['Foreign_Net'].sum()),
+                      'Institution_Net_Sum': int(g['Institution_Net'].sum()),
+                  })
+          pd.DataFrame(month_rows).to_csv(output / 'stock_period_summary_20260601_20260804.csv', index=False, encoding='utf-8-sig')
+
+          metadata = {
+              'requested_start': START,
+              'requested_end': END,
+              'market_cap_source': url,
+              'market_cap_first_date': str(period['Date'].min().date()),
+              'market_cap_last_date': str(period['Date'].max().date()),
+              'flow_source': 'pykrx stock.get_market_trading_value_by_date (KRX investor trading value)',
+              'diagnostics': diagnostics,
+          }
+          (output / 'metadata_20260601_20260804.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding='utf-8')
+
+          print(summary.to_string(index=False))
+          PY
+      - name: Commit output
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analysis_output
+          git commit -m 'Add June-August 2026 sector rotation dataset [skip ci]'
+          git push
