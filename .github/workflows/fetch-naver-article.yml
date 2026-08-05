@@ -1,0 +1,138 @@
+name: Fetch Naver article for analysis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fetch-naver-article.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-kor
+          pip install requests beautifulsoup4 pillow pytesseract
+      - name: Fetch and extract article
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.parse import urljoin
+          import io, re, json
+          import requests
+          from bs4 import BeautifulSoup
+          from PIL import Image
+          import pytesseract
+
+          urls = [
+              'https://n.news.naver.com/article/018/0004172838',
+              'https://n.news.naver.com/mnews/article/018/0004172838',
+              'https://news.naver.com/main/read.naver?oid=018&aid=0004172838',
+              'https://m.news.naver.com/read.nhn?oid=018&aid=0004172838',
+          ]
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36',
+              'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+              'Referer': 'https://news.naver.com/'
+          }
+          sess = requests.Session()
+          report = []
+          best = None
+          for url in urls:
+              try:
+                  r = sess.get(url, headers=headers, timeout=30, allow_redirects=True)
+                  report.append({'url':url,'status':r.status_code,'final_url':r.url,'length':len(r.content),'content_type':r.headers.get('content-type')})
+                  if r.status_code == 200 and len(r.text) > 5000:
+                      best = r
+                      break
+              except Exception as e:
+                  report.append({'url':url,'error':repr(e)})
+
+          out = Path('article_output')
+          out.mkdir(exist_ok=True)
+          (out/'fetch_report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+          if best is None:
+              raise SystemExit('No usable article response')
+
+          html = best.text
+          (out/'article.html').write_text(html, encoding='utf-8')
+          soup = BeautifulSoup(html, 'html.parser')
+
+          def meta(prop=None, name=None):
+              tag = soup.find('meta', attrs={'property': prop}) if prop else soup.find('meta', attrs={'name': name})
+              return tag.get('content','').strip() if tag else ''
+
+          title = meta(prop='og:title') or meta(name='twitter:title')
+          if not title:
+              el = soup.select_one('#title_area span, .media_end_head_headline, h2.end_tit, h3#articleTitle')
+              title = el.get_text(' ', strip=True) if el else ''
+          desc = meta(prop='og:description')
+          published = meta(prop='article:published_time')
+
+          article = soup.select_one('#dic_area, #newsct_article, .news_end, #articeBody, #articleBodyContents')
+          body = article.get_text('\n', strip=True) if article else ''
+
+          lines = [
+              f'TITLE: {title}',
+              f'PUBLISHED: {published}',
+              f'OG_DESCRIPTION: {desc}',
+              f'FINAL_URL: {best.url}',
+              '',
+              'ARTICLE_BODY:',
+              body,
+              '',
+              'IMAGE_INFO_AND_OCR:'
+          ]
+
+          image_nodes = (article.select('img') if article else soup.select('img'))
+          seen = set()
+          idx = 0
+          for img in image_nodes:
+              src = img.get('data-src') or img.get('src') or img.get('data-lazysrc') or img.get('data-original')
+              if not src:
+                  continue
+              src = urljoin(best.url, src)
+              if src in seen:
+                  continue
+              seen.add(src)
+              alt = img.get('alt','').strip()
+              parent_text = img.parent.get_text(' ', strip=True)[:500] if img.parent else ''
+              lines += [f'\n[IMAGE {idx}]', f'URL: {src}', f'ALT: {alt}', f'PARENT_TEXT: {parent_text}']
+              try:
+                  ir = sess.get(src, headers=headers, timeout=30)
+                  lines.append(f'STATUS: {ir.status_code}, BYTES: {len(ir.content)}, TYPE: {ir.headers.get("content-type")}')
+                  if ir.status_code == 200 and len(ir.content) > 1000:
+                      im = Image.open(io.BytesIO(ir.content)).convert('RGB')
+                      lines.append(f'SIZE: {im.size}')
+                      if im.width >= 300 and im.height >= 150:
+                          ocr = pytesseract.image_to_string(im, lang='kor+eng', config='--psm 6')
+                          ocr = re.sub(r'\n{3,}', '\n\n', ocr).strip()
+                          lines.append('OCR:\n' + ocr[:5000])
+              except Exception as e:
+                  lines.append('IMAGE_ERROR: ' + repr(e))
+              idx += 1
+
+          # Also retain nearby explicit source/caption strings from full HTML.
+          text_all = soup.get_text('\n', strip=True)
+          source_lines = [x for x in text_all.splitlines() if any(k in x for k in ['자료:', '출처:', '자료=', '출처=', '단위:', '그래프', '차트'])]
+          lines += ['\nSOURCE_OR_CAPTION_LINES:'] + source_lines[:200]
+
+          (out/'article_extract.txt').write_text('\n'.join(lines), encoding='utf-8')
+          print('\n'.join(lines[:100]))
+          PY
+      - name: Commit extraction
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add article_output
+          git commit -m 'Add temporary Naver article extraction [skip ci]'
+          git push
